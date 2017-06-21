@@ -1,0 +1,161 @@
+<link rel="import" href="bower_components/vaadin-grid/vaadin-grid.html">
+<link rel="import" href="bower_components/paper-fab/paper-fab.html">
+<link rel="import" href="token-ajax.html">
+<link rel="import" href="expense-editor.html">
+<dom-module id="expenses-list">
+  <template>
+    <style>
+      :host {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        border-right: 1px solid #ff00ff;
+        background: yellow;
+      }
+
+      .filters {
+        box-sizing: border-box;
+        height: 100px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        border-bottom: 1px solid #ff00ff;
+      }
+
+      #expenses::content thead.vaadin-grid-header th {
+        background: #0000ff;
+        color: #ff00ff;
+        font-size: 1.2em;
+        font-weight: 600;
+        border-top: 2px solid #ff00ff;
+        border-bottom: 2px solid #ff00ff;
+      }
+
+      #expenses::content thead.vaadin-grid-header th.last-frozen{
+        border-right: 1px solid #ff00ff;
+        color: #ff00ff;
+      }
+
+      .filters paper-input {
+        width: 80%;
+        color: #ff00ff;
+      }
+
+      #expenses {
+        flex: 1;
+        color: #0000ff;
+        font-weight: 500;
+     
+      }
+      
+      #expenseshead {
+        flex: 1;
+        color: #ff0000;
+        font-weight: 500;
+     
+      }
+
+      .add-button {
+        position: absolute;
+        bottom: 16px;
+        right: 16px;
+      }
+
+    </style>
+
+    <div class="filters">
+      <paper-input label="Filter by Merchant" value="{{merchant}}"></paper-input>
+    </div>
+
+    <vaadin-grid id="expenses" items="{{expenses}}" frozen-columns="1" 
+         on-selected-items-changed="_editExpense">
+      <table class="expenseshead">
+        <colgroup>
+          <col name="date" sortable width="150">
+          <col name="merchant" sortable width="200">
+          <col name="total" sortable>
+          <col name="status" sortable width="150">
+          <col name="comment" sortable>
+        </colgroup>
+      </table>
+    </vaadin-grid>
+
+    <paper-fab icon="add" on-tap="_addExpense" class="add-button"></paper-fab>
+
+  </template>
+  <script>
+    Polymer({
+      is: 'expenses-list',
+      properties: {
+        expenses: Array,
+        merchant: {
+          type: String,
+          observer: '_filterChanged'
+        }
+      },
+
+      ready: function() {
+        var grid = this.$.expenses;
+
+        grid.addEventListener('sort-order-changed', function() {
+          var sortProperty = grid.columns[grid.sortOrder[0].column].name;
+          var sortDirection = grid.sortOrder[0].direction;
+
+          grid.items.sort(function(a, b) {
+            var res;
+            if (!isNaN(a[sortProperty])) {
+              res = parseInt(a[sortProperty], 10) - parseInt(b[sortProperty], 10);
+            } else {
+              // Let's pretend everything that's not a number is a string.
+              res = a[sortProperty].localeCompare(b[sortProperty]);
+            }
+
+            if ('desc' === sortDirection) {
+              res *= -1;
+            }
+            return res;
+          });
+        });
+
+        grid.then(function() {
+          grid.columns[2].renderer = function(cell) {
+            cell.element.textContent = "$" + cell.data.toFixed(2);
+          };
+
+          grid.columns[3].renderer = function(cell) {
+            var status = cell.data.replace(/_/g, ' ');
+            status = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+            cell.element.textContent = status;
+          };
+        });
+      },
+
+      _filterChanged: function() {
+        if (this.expenses) {
+          var _this = this;
+          var filter = this.merchant;
+          this.debounce('_filterChanged', function() {
+            _this.$.expenses.items = _this.expenses.filter(function(exp) {
+              return filter ? exp.merchant.toUpperCase().indexOf(filter.toUpperCase()) >= 0 : true;
+            });
+          }, 300);
+        }
+      },
+
+      _addExpense: function() {
+        this.fire('edit-expense', {});
+      },
+
+      _editExpense: function(){
+        var _this = this;
+        var grid = this.$.expenses;
+        var selection = grid.selection.selected();
+        if (selection.length === 1) {
+          grid.getItem(selection[0], function(err, item) {
+            _this.fire('edit-expense', item);
+          });
+        }
+      }
+    });
+  </script>
+</dom-module>
